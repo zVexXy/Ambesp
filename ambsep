@@ -1,0 +1,116 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local RaycastParams = RaycastParams.new()
+
+-- Interface simples
+local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+gui.Name = "AimbotESPGui"
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 100, 0, 60)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.BackgroundTransparency = 0.4
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.Active = true
+frame.Draggable = true
+
+local aimbotBtn = Instance.new("TextButton", frame)
+aimbotBtn.Size = UDim2.new(0, 80, 0, 22)
+aimbotBtn.Position = UDim2.new(0, 10, 0, 7)
+aimbotBtn.Text = "Aimbot: OFF"
+aimbotBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+
+local espBtn = Instance.new("TextButton", frame)
+espBtn.Size = UDim2.new(0, 80, 0, 22)
+espBtn.Position = UDim2.new(0, 10, 0, 31)
+espBtn.Text = "ESP: OFF"
+espBtn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+
+local aimbotOn = false
+local espOn = false
+
+aimbotBtn.MouseButton1Click:Connect(function()
+    aimbotOn = not aimbotOn
+    aimbotBtn.Text = aimbotOn and "Aimbot: ON" or "Aimbot: OFF"
+end)
+espBtn.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espBtn.Text = espOn and "ESP: ON" or "ESP: OFF"
+end)
+
+-- Checa se inimigo está visível (sem parede/objeto na frente)
+local function IsEnemyVisible(head)
+    RaycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    RaycastParams.IgnoreWater = true
+    local result = workspace:Raycast(Camera.CFrame.Position, (head.Position-Camera.CFrame.Position).unit * (head.Position-Camera.CFrame.Position).Magnitude, RaycastParams)
+    if result then
+        return result.Instance:IsDescendantOf(head.Parent) -- Só acerta se bater no próprio inimigo
+    end
+    return false
+end
+
+-- Faz ESP
+local EspBoxes = {}
+local function UpdateESP()
+    for _, box in ipairs(EspBoxes) do
+        box:Destroy()
+    end
+    EspBoxes = {}
+
+    if not espOn then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen and IsEnemyVisible(head) then
+                local box = Instance.new("Frame", gui)
+                box.Size = UDim2.new(0, 30, 0, 30)
+                box.Position = UDim2.new(0, pos.X-15, 0, pos.Y-15)
+                box.BackgroundTransparency = 0.6
+                box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                box.BorderSizePixel = 0
+                table.insert(EspBoxes, box)
+            end
+        end
+    end
+end
+
+-- Aimbot: atira na cabeça de todo inimigo visível
+local lastShot = 0
+local shotInterval = 0.25 -- ajuste seguro
+
+local function ShootAt(head)
+    -- Você precisa substituir por sua função de tiro!
+    -- Exemplo genérico de simular disparo:
+    UIS.InputBegan:Fire({
+        UserInputType = Enum.UserInputType.MouseButton1,
+        Position = UIS:GetMouseLocation()
+    })
+end
+
+local function RunAimbot()
+    if not aimbotOn then return end
+    if tick() - lastShot < shotInterval then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            if IsEnemyVisible(head) then
+                -- Mira na cabeça
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                ShootAt(head)
+                lastShot = tick()
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+    RunAimbot()
+end)
