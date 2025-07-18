@@ -1,0 +1,134 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local RaycastParams = RaycastParams.new()
+
+-- Interface MOBILE-FRIENDLY
+local gui = Instance.new("ScreenGui")
+gui.Name = "AimbotESPGui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+
+-- Para executores, tente game.CoreGui:
+pcall(function() gui.Parent = game.CoreGui end)
+if not gui.Parent then
+    gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 110, 0, 65)
+frame.Position = UDim2.new(0, 15, 0, 15)
+frame.BackgroundTransparency = 0 -- 0 = opaco!
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+
+local aimbotBtn = Instance.new("TextButton")
+aimbotBtn.Size = UDim2.new(0, 90, 0, 24)
+aimbotBtn.Position = UDim2.new(0, 10, 0, 8)
+aimbotBtn.Text = "Aimbot: OFF"
+aimbotBtn.BackgroundColor3 = Color3.fromRGB(80, 150, 80)
+aimbotBtn.TextColor3 = Color3.fromRGB(255,255,255)
+aimbotBtn.Font = Enum.Font.SourceSansBold
+aimbotBtn.TextSize = 16
+aimbotBtn.Parent = frame
+
+local espBtn = Instance.new("TextButton")
+espBtn.Size = UDim2.new(0, 90, 0, 24)
+espBtn.Position = UDim2.new(0, 10, 0, 34)
+espBtn.Text = "ESP: OFF"
+espBtn.BackgroundColor3 = Color3.fromRGB(150, 80, 80)
+espBtn.TextColor3 = Color3.fromRGB(255,255,255)
+espBtn.Font = Enum.Font.SourceSansBold
+espBtn.TextSize = 16
+espBtn.Parent = frame
+
+local aimbotOn = false
+local espOn = false
+
+aimbotBtn.MouseButton1Click:Connect(function()
+    aimbotOn = not aimbotOn
+    aimbotBtn.Text = aimbotOn and "Aimbot: ON" or "Aimbot: OFF"
+    aimbotBtn.BackgroundColor3 = aimbotOn and Color3.fromRGB(40, 180, 40) or Color3.fromRGB(80,150,80)
+end)
+espBtn.MouseButton1Click:Connect(function()
+    espOn = not espOn
+    espBtn.Text = espOn and "ESP: ON" or "ESP: OFF"
+    espBtn.BackgroundColor3 = espOn and Color3.fromRGB(180, 40, 40) or Color3.fromRGB(150,80,80)
+end)
+
+-- Checa se inimigo está visível
+local function IsEnemyVisible(head)
+    RaycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    RaycastParams.IgnoreWater = true
+    local result = workspace:Raycast(Camera.CFrame.Position, (head.Position-Camera.CFrame.Position).unit * (head.Position-Camera.CFrame.Position).Magnitude, RaycastParams)
+    if result then
+        return result.Instance:IsDescendantOf(head.Parent)
+    end
+    return false
+end
+
+-- ESP
+local EspBoxes = {}
+local function UpdateESP()
+    for _, box in ipairs(EspBoxes) do
+        box:Destroy()
+    end
+    EspBoxes = {}
+
+    if not espOn then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+            if onScreen and IsEnemyVisible(head) then
+                local box = Instance.new("Frame", gui)
+                box.Size = UDim2.new(0, 28, 0, 28)
+                box.Position = UDim2.new(0, pos.X-14, 0, pos.Y-14)
+                box.BackgroundTransparency = 0.5
+                box.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                box.BorderSizePixel = 0
+                table.insert(EspBoxes, box)
+            end
+        end
+    end
+end
+
+-- Aimbot: atira na cabeça de todo inimigo visível
+local lastShot = 0
+local shotInterval = 0.3 -- ajuste seguro
+
+local function ShootAt(head)
+    -- Adapte para seu sistema de tiro!
+    UIS.InputBegan:Fire({
+        UserInputType = Enum.UserInputType.MouseButton1,
+        Position = UIS:GetMouseLocation()
+    })
+end
+
+local function RunAimbot()
+    if not aimbotOn then return end
+    if tick() - lastShot < shotInterval then return end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Team ~= LocalPlayer.Team and player.Character and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            if IsEnemyVisible(head) then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, head.Position)
+                ShootAt(head)
+                lastShot = tick()
+            end
+        end
+    end
+end
+
+RunService.RenderStepped:Connect(function()
+    UpdateESP()
+    RunAimbot()
+end)
